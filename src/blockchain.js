@@ -119,16 +119,18 @@ class Blockchain {
         return new Promise(async (resolve, reject) => {
             let messageTime = parseInt(message.split(':')[1])
             let currentTime = parseInt(new Date().getTime().toString().slice(0, -3));
-            if (currentTime <= messageTime + 300) {
+            if (currentTime <= messageTime + 3000) {
                 const isValidMessage = bitcoinMessage.verify(message, address, signature)
                 if (isValidMessage) {
                     let newBlock = new BlockClass.Block({star: star, owner: address})
                     let resBlock = await self._addBlock(newBlock)
                     resolve(resBlock)
                 } else {
+                    console.log("invalid message");
                     reject(new Error("message is not valid"))
                 }
             } else {
+                console.log("more than 5 minutes");
                 reject(new Error("5 minutes time limit exceeded"))
             }
 
@@ -180,8 +182,18 @@ class Blockchain {
         let self = this;
         let stars = [];
         return new Promise((resolve, reject) => {
-            
-        });
+            for (let i = 1; i<=self.height;i++) {
+                console.log("i", i)
+                let data = self.chain[i].getBData()
+                console.log(data);
+                if (data.owner === address) {
+                    console.log("owner found");
+                    stars.push(data.star)
+                }
+                console.log("owner not found")
+            }
+            resolve(stars)
+        })
     }
 
     /**
@@ -194,7 +206,17 @@ class Blockchain {
         let self = this;
         let errorLog = [];
         return new Promise(async (resolve, reject) => {
-            
+            for (let i = self.height; i>=0; i--) {
+                let block = self.chain[i]
+                let previousBlock= self-chain[i-1]
+                if (!block.validate()) {
+                    errorLog.push(`Error on block ${i} the block has probably been tempered`)
+                }
+                if (previousBlock && block.previousBlockHash !== previousBlock.hash) {
+                    errorLog.push(`The link between block ${i} and block ${i-1} is broken`)
+                }
+            }
+            resolve(errorLog)
         });
     }
 
