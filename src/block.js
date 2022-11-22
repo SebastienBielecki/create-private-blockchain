@@ -40,10 +40,15 @@ class Block {
         console.log("self", self);
         return new Promise((resolve, reject) => {
             // Save in auxiliary variable the current block hash
-            let observedHash = self.hash                                
+            let observedHash = self.hash   
+            console.log("observed hash: ", observedHash);                             
             // Recalculate the hash of the Block
-            self.hash = null
-            let theoreticalHash = SHA256(JSON.stringify(self)).toString(CryptoJS.enc.Hex)
+            let copyBlock = Object.assign({}, self)
+            copyBlock.hash = null
+            // console.log("original block: ", self);
+            // console.log("copy block: ", copyBlock);
+            let theoreticalHash = SHA256(JSON.stringify(copyBlock)).toString(CryptoJS.enc.Hex)
+            console.log("theoretical hash: ", theoreticalHash);
             // Comparing if the hashes changed
             if (observedHash === theoreticalHash) {
                 resolve(true)
@@ -82,9 +87,7 @@ class Block {
         // Parse the data to an object to be retrieve.
 
         // Resolve with the data if the object isn't the Genesis block
-
     }
-
 }
 
 // const block = new Block({title: "hello world", description: "jijiji"})

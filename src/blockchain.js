@@ -12,6 +12,7 @@ const SHA256 = require('crypto-js/sha256');
 var CryptoJS = require("crypto-js");
 const BlockClass = require('./block.js');
 const bitcoinMessage = require('bitcoinjs-message');
+const { Block } = require('bitcoinjs-lib');
 
 class Blockchain {
 
@@ -64,20 +65,45 @@ class Blockchain {
      */
     _addBlock(block) {
         let self = this;
+        // validate chain before adding the new block
         return new Promise(async (resolve, reject) => {
+           try {
+                let chainErrors = await self.validateChain()
+                console.log("chain errors:", chainErrors);
+                if (chainErrors.lenght > 0) {
+                    reject("chain has errors")
+                }  
+           } catch (error) {
+                console.log(error);
+           } 
+           
            let currentHeight = await self.getChainHeight()
            let newHeight = currentHeight + 1
            block.height = newHeight
            if (currentHeight === -1) {
+                // If new block is the genesys block, previous Hash shall be null
                 block.previousBlockHash = null
            } else {
+                // If new block is not the genesys, previous hash shall be the hash of the previous block
                 let previousBlock = await self.getBlockByHeight(currentHeight)
                 block.previousBlockHash = previousBlock.hash
            }
+           // assign the time and calculate hash of the new Block
            block.time = new Date().getTime().toString().slice(0,-3)
            block.hash = SHA256(JSON.stringify(block)).toString(CryptoJS.enc.Hex)
+           // Update the blockchain
            self.height = newHeight
            self.chain.push(block)
+           // validate chain after adding the new block
+           try {
+                let chainErrors = await self.validateChain()
+                console.log("chain errors:", chainErrors);
+                if (chainErrors.lenght > 0) {
+                    reject("chain has errors")
+                }  
+            } catch (error) {
+                    console.log(error);
+            } 
            resolve(block)
         });
     }
@@ -163,7 +189,7 @@ class Blockchain {
     getBlockByHeight(height) {
         let self = this;
         return new Promise((resolve, reject) => {
-            let block = self.chain.filter(p => p.height === height)[0];
+            let block = self.chain.find(p => p.height === height);
             if(block){
                 resolve(block);
             } else {
@@ -206,20 +232,35 @@ class Blockchain {
         let self = this;
         let errorLog = [];
         return new Promise(async (resolve, reject) => {
-            for (let i = self.height; i>=0; i--) {
-                let block = self.chain[i]
-                let previousBlock= self-chain[i-1]
-                if (!block.validate()) {
-                    errorLog.push(`Error on block ${i} the block has probably been tempered`)
-                }
-                if (previousBlock && block.previousBlockHash !== previousBlock.hash) {
-                    errorLog.push(`The link between block ${i} and block ${i-1} is broken`)
+            if (self.height === -1) {
+                resolve([])
+            } else {
+                // chechking from latest block to Genesys
+                for (let i = self.height; i>=0; i--) {
+                    let lastBlock = await self.chain[i]
+                    // check the hash of the block is correct
+                    let validBlock = await lastBlock.validate()
+                    if (!validBlock) {
+                        // hash is not correct
+                        errorLog.push(`Error on block ${i} the block has been tempered`)
+                    }
+                    if (i === 0) {
+                        // if we are checking the Genesys block, previousHash shall be null
+                        if (lastBlock.previousBlockHash !== null) {
+                            errorLog.push("previous hash on Genesys Block is not null")
+                        }
+                    } else {
+                        // we are not checking Geneys block. previous hash of the block shall be the hash of previous block
+                        let previousBlock= self.chain[i-1]
+                        if (lastBlock.previousBlockHash !== previousBlock.hash) {
+                            errorLog.push(`The link between block ${i} and block ${i-1} is broken`)
+                        }
+                    }
                 }
             }
             resolve(errorLog)
         });
     }
-
 }
 
 // let myBlockchain = new Blockchain
